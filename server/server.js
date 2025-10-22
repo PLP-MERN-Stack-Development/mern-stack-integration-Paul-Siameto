@@ -10,10 +10,33 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(morgan('combined'));
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  process.env.CLIENT_URL_PROD || 'https://mern-blog-lemon.vercel.app'
+]
+
+if (process.env.NODE_ENV === 'production' && process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL)
+}
+
+// Allow the deployed server URL (if provided) for server-to-server calls
+if (process.env.PUBLIC_API_URL) {
+  const serverOrigin = new URL(process.env.PUBLIC_API_URL).origin
+  if (!allowedOrigins.includes(serverOrigin)) allowedOrigins.push(serverOrigin)
+}
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CLIENT_URL 
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.'
+      return callback(new Error(msg), false)
+    }
+    return callback(null, true)
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
